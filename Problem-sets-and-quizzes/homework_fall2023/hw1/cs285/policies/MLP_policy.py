@@ -149,7 +149,7 @@ class MLPPolicySL(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
         actions = torch.FloatTensor(actions).to(ptu.device)
 
         act_dist = self.forward(observations)
-        loss = -act_dist.log_prob(actions).mean()
+        loss = - (act_dist.log_prob(actions).mean())
         
         # Perform backward pass and optimization
         self.optimizer.zero_grad()

@@ -132,7 +132,7 @@ def run_training_loop(params):
             # TODO: collect `params['batch_size']` transitions
             # HINT: use utils.sample_trajectories
             # TODO: implement missing parts of utils.sample_trajectory
-            paths, envsteps_this_batch = utils.sample_trajectories(env=env, policy=expert_policy,
+            paths, envsteps_this_batch = utils.sample_trajectories(env=env, policy=actor,
                                                                    min_timesteps_per_batch=params['batch_size'], 
                                                                    max_path_length=params['ep_len'])
 
@@ -179,7 +179,7 @@ def run_training_loop(params):
             # save eval rollouts as videos in tensorboard event file
             print('\nCollecting video rollouts eval')
             eval_video_paths = utils.sample_n_trajectories(
-                env, actor, MAX_NVIDEO, MAX_VIDEO_LEN, True)
+                env, expert_policy, MAX_NVIDEO, MAX_VIDEO_LEN, True)
 
             # save videos
             if eval_video_paths is not None:
@@ -193,7 +193,7 @@ def run_training_loop(params):
             # save eval metrics
             print("\nCollecting data for eval...")
             eval_paths, eval_envsteps_this_batch = utils.sample_trajectories(
-                env, actor, params['eval_batch_size'], params['ep_len'])
+                env, actor , params['eval_batch_size'], params['ep_len'])
 
             logs = utils.compute_metrics(paths, eval_paths)
             # compute additional metrics
@@ -224,14 +224,14 @@ def main():
     parser.add_argument('--env_name', '-env', type=str, help=f'choices: {", ".join(MJ_ENV_NAMES)}', required=True)
     parser.add_argument('--exp_name', '-exp', type=str, default='pick an experiment name', required=True)
     parser.add_argument('--do_dagger', action='store_true')
-    parser.add_argument('--ep_len', type=int)
+    parser.add_argument('--ep_len', type=int, default= 1000)
 
-    parser.add_argument('--num_agent_train_steps_per_iter', type=int, default=1000)  # number of gradient steps for training policy (per iter in n_iter)
+    parser.add_argument('--num_agent_train_steps_per_iter', type=int, default=500)  # number of gradient steps for training policy (per iter in n_iter)
     parser.add_argument('--n_iter', '-n', type=int, default=1)
 
     parser.add_argument('--batch_size', type=int, default=1000)  # training data collected (in the env) during each iteration
     parser.add_argument('--eval_batch_size', type=int,
-                        default=1000)  # eval data collected (in the env) for logging metrics
+                        default=5000)  # eval data collected (in the env) for logging metrics
     parser.add_argument('--train_batch_size', type=int,
                         default=100)  # number of sampled data points to be used per gradient/train step
 

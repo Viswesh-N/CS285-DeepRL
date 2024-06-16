@@ -36,7 +36,10 @@ def sample_trajectory(env, policy, max_path_length, render=False):
         # TODO use the most recent ob to decide what to do
         ob_tensor = torch.FloatTensor(ob).unsqueeze(0).to(ptu.device)
         ac_dist = policy.forward(ob_tensor)
-        ac = ac_dist.sample().cpu().numpy()[0]  # Ensure the action is a numpy array
+        if isinstance(ac_dist, torch.Tensor):
+            ac = ac_dist.cpu().detach().numpy()[0]
+        else:
+            ac = ac_dist.sample().cpu().numpy()[0]  # Ensure the action is a numpy array
 
         # TODO: take that action and get reward and next ob
         next_ob, rew, done, _ = env.step(ac)
