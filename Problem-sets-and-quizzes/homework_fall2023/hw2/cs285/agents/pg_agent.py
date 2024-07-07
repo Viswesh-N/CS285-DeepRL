@@ -87,8 +87,6 @@ class PGAgent(nn.Module):
             obs, rewards, q_values, terminals
         )
 
-        
-
         # step 3: use all datapoints (s_t, a_t, adv_t) to update the PG actor/policy
         # TODO: update the PG actor/policy network once using the advantages
         policy_loss = self.actor.update(obs, actions, advantages)
