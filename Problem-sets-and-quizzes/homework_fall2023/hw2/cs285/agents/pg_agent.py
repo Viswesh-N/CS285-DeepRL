@@ -30,13 +30,13 @@ class PGAgent(nn.Module):
         # create the actor (policy) network
         self.actor = MLPPolicyPG(
             ac_dim, ob_dim, discrete, n_layers, layer_size, learning_rate
-        )
+        ).to(ptu.device)
 
         # create the critic (baseline) network, if needed
         if use_baseline:
             self.critic = ValueCritic(
                 ob_dim, n_layers, layer_size, baseline_learning_rate
-            )
+            ).to(ptu.device)
             self.baseline_gradient_steps = baseline_gradient_steps
         else:
             self.critic = None
@@ -67,19 +67,38 @@ class PGAgent(nn.Module):
         # TODO: flatten the lists of arrays into single arrays, so that the rest of the code can be written in a vectorized
         # way. obs, actions, rewards, terminals, and q_values should all be arrays with a leading dimension of `batch_size`
         # beyond this point.
+        obs = np.concatenate(obs)
+        actions = np.concatenate(actions)
+        rewards = np.concatenate(rewards)
+        terminals = np.concatenate(terminals)
+        q_values = np.concatenate(q_values)
+
+
+        obs = ptu.from_numpy(obs).to(ptu.device)
+        actions = ptu.from_numpy(actions).to(ptu.device)
+        rewards = ptu.from_numpy(rewards).to(ptu.device)
+        terminals = ptu.from_numpy(terminals).to(ptu.device)
+        q_values = ptu.from_numpy(q_values).to(ptu.device)
+        
+
 
         # step 2: calculate advantages from Q values
         advantages: np.ndarray = self._estimate_advantage(
             obs, rewards, q_values, terminals
         )
 
+        
+
         # step 3: use all datapoints (s_t, a_t, adv_t) to update the PG actor/policy
         # TODO: update the PG actor/policy network once using the advantages
-        info: dict = None
+        policy_loss = self.actor.update(obs, actions, advantages)
+        info: dict = {"Policy Loss": policy_loss["Actor Loss"].item()}
+
 
         # step 4: if needed, use all datapoints (s_t, a_t, q_t) to update the PG critic/baseline
         if self.critic is not None:
             # TODO: perform `self.baseline_gradient_steps` updates to the critic/baseline network
+            
             critic_info: dict = None
 
             info.update(critic_info)
@@ -89,17 +108,27 @@ class PGAgent(nn.Module):
     def _calculate_q_vals(self, rewards: Sequence[np.ndarray]) -> Sequence[np.ndarray]:
         """Monte Carlo estimation of the Q function."""
 
+        
+        N = len(rewards)
+        q_values = [np.zeros_like(r) for r in rewards]
+
         if not self.use_reward_to_go:
             # Case 1: in trajectory-based PG, we ignore the timestep and instead use the discounted return for the entire
             # trajectory at each point.
             # In other words: Q(s_t, a_t) = sum_{t'=0}^T gamma^t' r_{t'}
             # TODO: use the helper function self._discounted_return to calculate the Q-values
-            q_values = None
+            
+            for i in range(N):
+                q_values[i] = np.array(self._discounted_return(rewards[i].tolist()))
+
+
         else:
             # Case 2: in reward-to-go PG, we only use the rewards after timestep t to estimate the Q-value for (s_t, a_t).
             # In other words: Q(s_t, a_t) = sum_{t'=t}^T gamma^(t'-t) * r_{t'}
             # TODO: use the helper function self._discounted_reward_to_go to calculate the Q-values
-            q_values = None
+            for i in range(N):
+                q_values[i]  = np.array(self._discounted_reward_to_go(rewards[i].tolist()))
+            
 
         return q_values
 
@@ -116,7 +145,7 @@ class PGAgent(nn.Module):
         """
         if self.critic is None:
             # TODO: if no baseline, then what are the advantages?
-            advantages = None
+            advantages = q_values
         else:
             # TODO: run the critic and use it as a baseline
             values = None
@@ -156,7 +185,15 @@ class PGAgent(nn.Module):
         Note that all entries of the output list should be the exact same because each sum is from 0 to T (and doesn't
         involve t)!
         """
-        return None
+        T = len(rewards)
+        discounted_return = 0
+
+        for i in range(T):
+            discounted_return += ((self.gamma)**i)*rewards[i]
+
+        disc_ret = [discounted_return]*T
+
+        return disc_ret
 
 
     def _discounted_reward_to_go(self, rewards: Sequence[float]) -> Sequence[float]:
@@ -164,4 +201,12 @@ class PGAgent(nn.Module):
         Helper function which takes a list of rewards {r_0, r_1, ..., r_t', ... r_T} and returns a list where the entry
         in each index t' is sum_{t'=t}^T gamma^(t'-t) * r_{t'}.
         """
-        return None
+        
+        T = len(rewards)
+        disc_ret = [0]*T
+        disc_ret[T-1] = rewards[T-1]
+        
+        for i in range(T - 2, -1, -1):
+            disc_ret[i] = rewards[i] + self.gamma*disc_ret[i+1]
+            
+        return disc_ret

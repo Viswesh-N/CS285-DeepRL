@@ -34,7 +34,7 @@ class MLPPolicy(nn.Module):
                 output_size=ac_dim,
                 n_layers=n_layers,
                 size=layer_size,
-            ).to(ptu.device)
+            )
             parameters = self.logits_net.parameters()
         else:
             self.mean_net = ptu.build_mlp(
@@ -42,7 +42,7 @@ class MLPPolicy(nn.Module):
                 output_size=ac_dim,
                 n_layers=n_layers,
                 size=layer_size,
-            ).to(ptu.device)
+            )
             self.logstd = nn.Parameter(
                 torch.zeros(ac_dim, dtype=torch.float32, device=ptu.device)
             )
@@ -59,8 +59,16 @@ class MLPPolicy(nn.Module):
     def get_action(self, obs: np.ndarray) -> np.ndarray:
         """Takes a single observation (as a numpy array) and returns a single action (as a numpy array)."""
         # TODO: implement get_action
-        action = None
 
+        if(len(obs.shape)>1):
+            obs = obs
+        else:
+            obs = obs[None] 
+        observation = ptu.from_numpy(obs)
+        action_distribution = self(observation)
+        action = action_distribution.sample()
+        action = ptu.to_numpy(action)
+    
         return action
 
     def forward(self, obs: torch.FloatTensor):
@@ -69,13 +77,21 @@ class MLPPolicy(nn.Module):
         able to differentiate through it. For example, you can return a torch.FloatTensor. You can also return more
         flexible objects, such as a `torch.distributions.Distribution` object. It's up to you!
         """
+        obs = obs.to(ptu.device)
         if self.discrete:
             # TODO: define the forward pass for a policy with a discrete action space.
-            pass
+            logits = self.logits_net(obs)
+            action_distribution = distributions.Categorical(logits = logits)
+            
         else:
             # TODO: define the forward pass for a policy with a continuous action space.
-            pass
-        return None
+            means = self.mean_net(obs)
+            std_matrix = torch.diag(torch.exp(self.logstd)).to(ptu.device)
+            batch_dim = means.shape[0]
+            batch_std_matrix = std_matrix.repeat(batch_dim, 1, 1)
+            action_distribution = distributions.MultivariateNormal(means, batch_std_matrix)
+            
+        return action_distribution
 
     def update(self, obs: np.ndarray, actions: np.ndarray, *args, **kwargs) -> dict:
         """Performs one iteration of gradient descent on the provided batch of data."""
@@ -92,12 +108,18 @@ class MLPPolicyPG(MLPPolicy):
         advantages: np.ndarray,
     ) -> dict:
         """Implements the policy gradient actor update."""
-        obs = ptu.from_numpy(obs)
-        actions = ptu.from_numpy(actions)
-        advantages = ptu.from_numpy(advantages)
 
         # TODO: implement the policy gradient actor update.
-        loss = None
+
+        self.optimizer.zero_grad()
+        action_distribution = self(obs)
+        log_probs = action_distribution.log_prob(actions)
+        
+        loss = -(log_probs*advantages).mean()
+        loss.backward()
+
+        self.optimizer.step()
+
 
         return {
             "Actor Loss": ptu.to_numpy(loss),
