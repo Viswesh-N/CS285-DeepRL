@@ -74,13 +74,12 @@ class PGAgent(nn.Module):
         q_values = np.concatenate(q_values)
 
 
-        obs = ptu.from_numpy(obs).to(ptu.device)
-        actions = ptu.from_numpy(actions).to(ptu.device)
-        rewards = ptu.from_numpy(rewards).to(ptu.device)
-        terminals = ptu.from_numpy(terminals).to(ptu.device)
-        q_values = ptu.from_numpy(q_values).to(ptu.device)
+        obs = ptu.from_numpy(obs)
+        actions = ptu.from_numpy(actions)
+        rewards = ptu.from_numpy(rewards)
+        terminals = ptu.from_numpy(terminals)
+        q_values = ptu.from_numpy(q_values)
         
-
 
         # step 2: calculate advantages from Q values
         advantages: np.ndarray = self._estimate_advantage(
@@ -96,8 +95,9 @@ class PGAgent(nn.Module):
         # step 4: if needed, use all datapoints (s_t, a_t, q_t) to update the PG critic/baseline
         if self.critic is not None:
             # TODO: perform `self.baseline_gradient_steps` updates to the critic/baseline network
-            
-            critic_info: dict = None
+            for _ in range(self.baseline_gradient_steps):
+                critic_loss = self.critic.update(obs, q_values)
+            critic_info: dict = {"Critic Loss": critic_loss["Baseline Loss"]}
 
             info.update(critic_info)
 
@@ -146,12 +146,14 @@ class PGAgent(nn.Module):
             advantages = q_values
         else:
             # TODO: run the critic and use it as a baseline
-            values = None
+            values = self.critic(obs)
+            values = ptu.to_numpy(values).flatten()
+
             assert values.shape == q_values.shape
 
             if self.gae_lambda is None:
                 # TODO: if using a baseline, but not GAE, what are the advantages?
-                advantages = None
+                advantages = q_values - values
             else:
                 # TODO: implement GAE
                 batch_size = obs.shape[0]
@@ -164,14 +166,19 @@ class PGAgent(nn.Module):
                     # TODO: recursively compute advantage estimates starting from timestep T.
                     # HINT: use terminals to handle edge cases. terminals[i] is 1 if the state is the last in its
                     # trajectory, and 0 otherwise.
-                    pass
+                    if terminals[i]:
+                        delta = rewards[i] + self.gamma * values[i + 1] * (1 - terminals[i]) - values[i]
+                    else:
+                        delta = q_values[i] + self.gamma * values[i + 1] - values[i]
+
+                    advantages[i] = delta + self.gamma * self.gae_lambda * advantages[i + 1]
 
                 # remove dummy advantage
                 advantages = advantages[:-1]
 
         # TODO: normalize the advantages to have a mean of zero and a standard deviation of one within the batch
         if self.normalize_advantages:
-            pass
+            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
         return advantages
 

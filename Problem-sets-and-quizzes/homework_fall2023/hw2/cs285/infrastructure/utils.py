@@ -33,7 +33,8 @@ def sample_trajectory(
         ac: np.ndarray = policy.get_action(ob)
         if env.action_space.__class__.__name__ == 'Discrete':
             ac = int(ac)
-
+        else:
+            ac = np.clip(ac, env.action_space.low, env.action_space.high)
 
         # TODO: use that action to take a step in the environment
         next_ob, rew, done, _ = env.step(ac)

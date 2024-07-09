@@ -67,7 +67,9 @@ class MLPPolicy(nn.Module):
         observation = ptu.from_numpy(obs)
         action_distribution = self(observation)
         action = action_distribution.sample()
-        action = ptu.to_numpy(action)
+        action = ptu.to_numpy(action).squeeze(0)
+
+    
     
         return action
 
@@ -77,7 +79,6 @@ class MLPPolicy(nn.Module):
         able to differentiate through it. For example, you can return a torch.FloatTensor. You can also return more
         flexible objects, such as a `torch.distributions.Distribution` object. It's up to you!
         """
-        obs = obs.to(ptu.device)
         if self.discrete:
             # TODO: define the forward pass for a policy with a discrete action space.
             logits = self.logits_net(obs)
