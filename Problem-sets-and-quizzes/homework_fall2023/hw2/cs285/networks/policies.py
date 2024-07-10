@@ -87,14 +87,13 @@ class MLPPolicy(nn.Module):
             
         else:
             # TODO: define the forward pass for a policy with a continuous action space.
-            
-            batch_mean = self.mean_net(obs)
-            batch_logstd = self.logstd.expand_as(batch_mean)  # Ensure logstd matches batch size
-            batch_std = torch.exp(batch_logstd)
-            # print(f"Batch Std: {batch_std.mean().item()}")  # Log the mean of the standard deviation
-            action_distribution = distributions.Normal(batch_mean, batch_std)
 
+            batch_mean = self.mean_net(obs)
+            logstd_clamped = torch.clamp(self.logstd, min=-20, max=2)
+            scale_tril = torch.diag_embed(torch.exp(logstd_clamped).expand(batch_mean.shape[0], -1))
+            action_distribution = distributions.MultivariateNormal(batch_mean, scale_tril=scale_tril)
             
+
         return action_distribution
 
     def update(self, obs: np.ndarray, actions: np.ndarray, *args, **kwargs) -> dict:
@@ -122,19 +121,24 @@ class MLPPolicyPG(MLPPolicy):
          
         action_distribution = self(ob)
         if (self.discrete):
-            log_probs = action_distribution.log_prob(acs)
+            # log_probs = action_distribution.log_prob(acs)
+            entropy = action_distribution.entropy().mean()
             print("updating discrete")
         else:
-            log_probs = action_distribution.log_prob(acs).sum(dim = -1)
-            print("log probs", log_probs)
+            # log_probs = action_distribution.log_prob(acs).sum(dim = -1)
+            # print("log probs", log_pi)
+            entropy = action_distribution.entropy().sum(dim=-1).mean()
+            
+            
+
             print("updating cont")
-        loss = -(log_probs * advantages).mean()
+
+        log_pi = self.forward(ob).log_prob(acs)
+        loss = - torch.mean(torch.mul(log_pi, advantages)) - 0.01* entropy
 
 
         self.optimizer.zero_grad()
         loss.backward()
-        max_norm = 0.5
-        nn.utils.clip_grad_norm_(self.parameters(), max_norm = max_norm)
 
         self.optimizer.step()
 
