@@ -1,4 +1,5 @@
 from collections import OrderedDict
+import gym.spaces
 import numpy as np
 import copy
 from cs285.networks.policies import MLPPolicy
@@ -31,10 +32,11 @@ def sample_trajectory(
 
         # TODO use the most recent ob and the policy to decide what to do
         ac: np.ndarray = policy.get_action(ob)
-        if env.action_space.__class__.__name__ == 'Discrete':
-            ac = int(ac)
-        else:
-            ac = np.clip(ac, env.action_space.low, env.action_space.high)
+        ac = ac[0]
+
+        if (isinstance(env.action_space, gym.spaces.Box)):
+            ac =  np.clip(ac, env.action_space.low, env.action_space.high)
+
 
         # TODO: use that action to take a step in the environment
         next_ob, rew, done, _ = env.step(ac)

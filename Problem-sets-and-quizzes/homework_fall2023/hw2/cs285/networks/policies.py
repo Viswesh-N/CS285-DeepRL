@@ -64,13 +64,14 @@ class MLPPolicy(nn.Module):
             obs = obs
         else:
             obs = obs[None] 
-        observation = ptu.from_numpy(obs)
-        action_distribution = self(observation)
+        
+        ob = ptu.from_numpy(obs)
+        action_distribution = self(ob)
         action = action_distribution.sample()
-        action = ptu.to_numpy(action).squeeze(0)
+        action = ptu.to_numpy(action)
 
-    
-    
+        
+
         return action
 
     def forward(self, obs: torch.FloatTensor):
@@ -86,11 +87,13 @@ class MLPPolicy(nn.Module):
             
         else:
             # TODO: define the forward pass for a policy with a continuous action space.
-            means = self.mean_net(obs)
-            std_matrix = torch.diag(torch.exp(self.logstd)).to(ptu.device)
-            batch_dim = means.shape[0]
-            batch_std_matrix = std_matrix.repeat(batch_dim, 1, 1)
-            action_distribution = distributions.MultivariateNormal(means, batch_std_matrix)
+            
+            batch_mean = self.mean_net(obs)
+            batch_logstd = self.logstd.expand_as(batch_mean)  # Ensure logstd matches batch size
+            batch_std = torch.exp(batch_logstd)
+            # print(f"Batch Std: {batch_std.mean().item()}")  # Log the mean of the standard deviation
+            action_distribution = distributions.Normal(batch_mean, batch_std)
+
             
         return action_distribution
 
@@ -112,12 +115,26 @@ class MLPPolicyPG(MLPPolicy):
 
         # TODO: implement the policy gradient actor update.
 
+        print("advantages:",advantages)
+        advantages = ptu.from_numpy(advantages)
+        ob = ptu.from_numpy(obs)
+        acs = ptu.from_numpy(actions)
+         
+        action_distribution = self(ob)
+        if (self.discrete):
+            log_probs = action_distribution.log_prob(acs)
+            print("updating discrete")
+        else:
+            log_probs = action_distribution.log_prob(acs).sum(dim = -1)
+            print("log probs", log_probs)
+            print("updating cont")
+        loss = -(log_probs * advantages).mean()
+
+
         self.optimizer.zero_grad()
-        action_distribution = self(obs)
-        log_probs = action_distribution.log_prob(actions)
-        
-        loss = -(log_probs*advantages).mean()
         loss.backward()
+        max_norm = 0.5
+        nn.utils.clip_grad_norm_(self.parameters(), max_norm = max_norm)
 
         self.optimizer.step()
 

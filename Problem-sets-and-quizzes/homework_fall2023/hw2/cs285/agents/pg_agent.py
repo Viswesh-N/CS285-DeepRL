@@ -73,13 +73,7 @@ class PGAgent(nn.Module):
         terminals = np.concatenate(terminals)
         q_values = np.concatenate(q_values)
 
-
-        obs = ptu.from_numpy(obs)
-        actions = ptu.from_numpy(actions)
-        rewards = ptu.from_numpy(rewards)
-        terminals = ptu.from_numpy(terminals)
-        q_values = ptu.from_numpy(q_values)
-        
+    
 
         # step 2: calculate advantages from Q values
         advantages: np.ndarray = self._estimate_advantage(
@@ -97,9 +91,7 @@ class PGAgent(nn.Module):
             # TODO: perform `self.baseline_gradient_steps` updates to the critic/baseline network
             for _ in range(self.baseline_gradient_steps):
                 critic_loss = self.critic.update(obs, q_values)
-            critic_info: dict = {"Critic Loss": critic_loss["Baseline Loss"]}
-
-            info.update(critic_info)
+            info.update({"Critic Loss": critic_loss["Baseline Loss"].item()})
 
         return info
 
@@ -146,9 +138,9 @@ class PGAgent(nn.Module):
             advantages = q_values
         else:
             # TODO: run the critic and use it as a baseline
+            obs = ptu.from_numpy(obs)
             values = self.critic(obs)
-            values = ptu.to_numpy(values).flatten()
-
+            values = ptu.to_numpy(values)
             assert values.shape == q_values.shape
 
             if self.gae_lambda is None:
@@ -166,12 +158,11 @@ class PGAgent(nn.Module):
                     # TODO: recursively compute advantage estimates starting from timestep T.
                     # HINT: use terminals to handle edge cases. terminals[i] is 1 if the state is the last in its
                     # trajectory, and 0 otherwise.
-                    if terminals[i]:
-                        delta = rewards[i] + self.gamma * values[i + 1] * (1 - terminals[i]) - values[i]
+                    if terminals[i] == 1:
+                        advantages[i] = q_values[i] - values[i]
                     else:
-                        delta = q_values[i] + self.gamma * values[i + 1] - values[i]
-
-                    advantages[i] = delta + self.gamma * self.gae_lambda * advantages[i + 1]
+                        advantages[i] = q_values[i] + self.gamma * values[i + 1] - values[i]
+                    
 
                 # remove dummy advantage
                 advantages = advantages[:-1]
