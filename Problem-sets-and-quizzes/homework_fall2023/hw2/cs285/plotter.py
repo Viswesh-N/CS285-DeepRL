@@ -3,33 +3,33 @@ import matplotlib.pyplot as plt
 from tensorboard.backend.event_processing import event_accumulator
 import argparse
 
-def extract_data_from_event_file(file_path):
+def extract_data_from_event_file(file_path, tag):
     ea = event_accumulator.EventAccumulator(file_path)
     ea.Reload()
 
     timesteps = []
-    avg_returns = []
+    values = []
 
-    for event in ea.Scalars('Eval_AverageReturn'):
+    for event in ea.Scalars(tag):
         timesteps.append(event.step)
-        avg_returns.append(event.value)
+        values.append(event.value)
 
-    return timesteps, avg_returns
+    return timesteps, values
 
-def plot_experiments(data_dir):
+def plot_experiments(data_dir, tag):
     plt.figure(figsize=(10, 6))
 
     for root, dirs, files in os.walk(data_dir):
         for file in files:
             if file.startswith("events.out.tfevents"):
                 file_path = os.path.join(root, file)
-                timesteps, avg_returns = extract_data_from_event_file(file_path)
+                timesteps, values = extract_data_from_event_file(file_path, tag)
                 label = os.path.basename(root)
-                plt.plot(timesteps, avg_returns, label=label)
+                plt.plot(timesteps, values, label=label)
 
     plt.xlabel('Timesteps')
-    plt.ylabel('Average Return')
-    plt.title('Average Eval Return vs Timesteps for Multiple Experiments')
+    plt.ylabel('Average Return' if tag == 'Eval_AverageReturn' else 'Critic Loss')
+    plt.title(f'Average {"Eval Return" if tag == "Eval_AverageReturn" else "Critic Loss"} vs Timesteps for Multiple Experiments')
     plt.legend()
     plt.grid(True)
     plt.show()
@@ -37,9 +37,11 @@ def plot_experiments(data_dir):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_dir', type=str, required=True, help='Directory containing event files')
+    parser.add_argument('--critic_plot', action='store_true', help='Plot Critic Loss instead of Eval_AverageReturn')
     args = parser.parse_args()
 
-    plot_experiments(args.data_dir)
+    tag = 'Eval_AverageReturn' if not args.critic_plot else 'Critic Loss'
+    plot_experiments(args.data_dir, tag)
 
 if __name__ == "__main__":
     main()
