@@ -233,7 +233,6 @@ class MemoryEfficientReplayBuffer:
         if isinstance(action, int):
             action = np.array(action, dtype=np.int64)
 
-        print("next observation shape", next_observation.shape)
 
         assert (
             next_observation.ndim == 2
