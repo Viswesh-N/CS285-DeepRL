@@ -2,6 +2,8 @@ base_config: sac
 env_name: InvertedPendulum-v4
 exp_name: sanity_invpendulum_reinforce
 actor_gradient_type: reinforce
+use_entropy_bonus: true
+target_critic_backup_type: min
 # Use hard target update by default.
 # comment this line and uncomment the next to test your soft target update.
 target_update_period: 1000

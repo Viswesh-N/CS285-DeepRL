@@ -1,5 +1,5 @@
 num_critic_networks: 2
-target_critic_backup_type: doubleq
+target_critic_backup_type: min
 exp_name: sac_hopper_doubleq
 
 # Same for all Hopper experiments
