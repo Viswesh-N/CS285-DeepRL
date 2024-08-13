@@ -253,7 +253,7 @@ class ModelBasedAgent(nn.Module):
                 elite_indices = np.argsort(seq_rewards)[-self.cem_num_elites:]
                 elite_acs = action_sequences[elite_indices]
                 elite_mean = np.mean(elite_acs, axis = 0)
-                elite_std = np.std(elite_acs, dim = 0) + 1e-8
+                elite_std = np.std(elite_acs, axis= 0) + 1e-8
 
             return elite_mean[0]
                 
