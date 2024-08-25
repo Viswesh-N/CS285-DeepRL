@@ -1,5 +1,6 @@
 from typing import Tuple
 import numpy as np
+import random
 
 
 class RandomAgent:
@@ -9,7 +10,7 @@ class RandomAgent:
 
     def get_action(self, *args, **kwargs):
         # TODO(student): Return a random action
-        return ...
+        return np.random.randint(0, self.num_actions)
     
     def update(self, *args, **kwargs):
         # Update is a no-op for the random agent
