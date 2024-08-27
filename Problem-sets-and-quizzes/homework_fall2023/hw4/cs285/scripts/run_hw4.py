@@ -10,9 +10,6 @@ from cs285.agents.soft_actor_critic import SoftActorCritic
 from cs285.infrastructure.replay_buffer import ReplayBuffer
 import cs285.env_configs
 
-import os
-import time
-
 import gym
 import numpy as np
 import torch
